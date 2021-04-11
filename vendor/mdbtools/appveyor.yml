@@ -1,0 +1,29 @@
+version: 0.1.{build}
+
+os: Windows Server 2012 R2
+
+platform: x64
+
+environment:
+  matrix:
+  - TOOLCHAIN: "cygwin"
+
+branches:
+  only:
+    - dev
+    - master
+
+clone_folder: c:\projects\mdbtools
+
+skip_tags: true
+
+build_script:
+  - C:\cygwin64\setup-x86_64.exe -q -P bison -P flex -P libiconv-devel
+  - C:\cygwin64\bin\sh -lc "cd /cygdrive/c/projects/mdbtools && git clone https://github.com/mdbtools/mdbtestdata.git test"
+  - C:\cygwin64\bin\sh -lc "cd /cygdrive/c/projects/mdbtools && autoreconf -i -f"
+  - C:\cygwin64\bin\sh -lc "cd /cygdrive/c/projects/mdbtools && ./configure --disable-man --disable-silent-rules"
+  - C:\cygwin64\bin\sh -lc "cd /cygdrive/c/projects/mdbtools && make"
+
+test_script:
+  - C:\cygwin64\bin\sh -lc "cd /cygdrive/c/projects/mdbtools && ./test_script.sh"
+  - C:\cygwin64\bin\sh -lc "cd /cygdrive/c/projects/mdbtools && ./test_sql.sh"
