@@ -1,0 +1,44 @@
+NAME
+  mdb-array - Export data in an MDB database table to a C array.
+
+SYNOPSIS
+  mdb-array database table
+
+DESCRIPTION
+  mdb-array is a utility program distributed with MDB Tools.
+
+  mdb-array prints a C source code file to stdout, containing an array
+  representing the data of the specified table.
+
+ENVIRONMENT
+  MDB_JET3_CHARSET    Defines the charset of the input JET3 (access 97) file. Default is CP1252. See iconv(1).
+  MDBICONV            Defines the output charset. Default is UTF-8. mdbtools must have been compiled with iconv.
+  MDBOPTS             Colon-separated list of options:
+                      * debug_like
+                      * debug_write
+                      * debug_usage
+                      * debug_ole
+                      * debug_row
+                      * debug_props
+                      * debug_all is a shortcut for all debug_* options
+                      * no_memo (deprecated; has no effect)
+                      * use_index (experimental; requires libmswstr)
+
+FUTURE DIRECTIONS
+  mdb-array is deprecated. Soon, it will no longer be distributed.
+
+  It is the feeling of developers that it is not used, as C code generation
+  is now usually replaced by more generic approaches, including libmdb calls
+  and odbc.
+
+  However, should you find this tool useful, drop us a line at
+  https://github.com/mdbtools/mdbtools/issues/197
+  and we'll consider maintaining it.
+
+SEE ALSO
+  mdb-count(1) mdb-export(1) mdb-header(1) mdb-hexdump(1)
+  mdb-import(1) mdb-json(1) mdb-parsecsv(1) mdb-prop(1) mdb-queries(1)
+  mdb-schema(1) mdb-sql(1) mdb-tables(1) mdb-ver(1)
+
+AUTHORS
+  The mdb-array utility was written by Brian Bruns.
