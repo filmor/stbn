@@ -1,5 +1,5 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_INIT([mdbtools],[0.9.2],[https://github.com/mdbtools/mdbtools/issues],[],[https://github.com/mdbtools/mdbtools])
+AC_INIT([mdbtools],[0.9.3-beta4],[https://github.com/mdbtools/mdbtools/issues],[],[https://github.com/mdbtools/mdbtools])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_SRCDIR(src/extras/mdb-dump.c)
@@ -7,11 +7,11 @@ AM_INIT_AUTOMAKE([foreign dist-zip])
 
 MDBTOOLS_VERSION_MAJOR=0
 MDBTOOLS_VERSION_MINOR=9
-MDBTOOLS_VERSION_MICRO=2
+MDBTOOLS_VERSION_MICRO=3
 
 # Update these numbers with every release
 # See https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
-VERSION_INFO=3:2:0
+VERSION_INFO=3:3:0
 AC_SUBST(VERSION_INFO)
 AC_SUBST(MDBTOOLS_CFLAGS)
 
@@ -30,7 +30,6 @@ AC_PROG_YACC
 dnl Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS(fcntl.h limits.h unistd.h xlocale.h)
-AC_CHECK_HEADERS(wordexp.h)
 AC_CHECK_LIB(mswstr, DBLCMapStringW)
 AC_CHECK_DECLS([program_invocation_short_name], [], [], [[
                 #define _GNU_SOURCE
@@ -157,7 +156,7 @@ AC_ARG_WITH(unixodbc,
 if test "$with_unixodbc"; then
 	HAVE_ODBC=true
 	ODBC_CFLAGS="-I$with_unixodbc/include"
-	ODBC_LIBS="-L$with_unixodbc/lib"
+	ODBC_LIBS="-L$with_unixodbc/$libdir"
 	CFLAGS="$CFLAGS -DUNIXODBC"
 
 	dnl SIZEOF_LONG_INT and HAVE_LONG_LONG are required by some versions of unixODBC
@@ -216,8 +215,8 @@ if test "$enable_glib" = "yes"; then
     GLIB_PACKAGE=glib-2.0
     PKG_CHECK_MODULES([GLIB], [$GLIB_PACKAGE], HAVE_GLIB=true, HAVE_GLIB=false)
     if test "x$HAVE_GLIB" = "xtrue"; then
-        MDBTOOLS_CFLAGS="$MDBTOOLS_CFLAGS -DHAVE_GLIB=1"
         GLIB_CFLAGS="$GLIB_CFLAGS -DHAVE_GLIB=1"
+        AC_CHECK_LIB($GLIB_PACKAGE, g_memdup2, [GLIB_CFLAGS="$GLIB_CFLAGS -DHAVE_G_MEMDUP2=1"])
         AC_SUBST(GLIB_PACKAGE)
     else
         enable_glib=no
