@@ -15,29 +15,12 @@ static void set_value(val&, MdbColumn*, std::vector<char> const&, unsigned);
 
 class Mdb {
 public:
-  Mdb(std::string const &path) {
-    std::cout << "Reading file " << path << std::endl;
-    auto handle = mdb_open(path.c_str(), MdbFileFlags::MDB_WRITABLE);
-    if (handle == nullptr)
-      throw "failed to open file";
-
-    std::cout << "Reading catalog" << std::endl;
-    if (!mdb_read_catalog(handle, MDB_TABLE)) {
-      mdb_close(handle);
-      throw "failed to read catalog";
-    }
-
-    std::cout << "Done" << std::endl;
-
-    m_handle = handle;
+  Mdb(std::string const &path) : m_path(path) {
+    reopen();
   }
 
   ~Mdb() {
-    for (auto &k : m_tables) {
-      mdb_free_tabledef(k.second);
-    }
-
-    mdb_close(m_handle);
+    close();
   }
 
   val get_tables() {
@@ -51,7 +34,7 @@ public:
   }
 
   bool load_table(std::string const &name) {
-    if (m_tables.count(name))
+    if (m_tables.count(name) > 0)
       return true;
 
     std::cout << "Reading table " << name << std::endl;
@@ -62,8 +45,9 @@ public:
 
     m_tables[name] = table;
 
-    std::cout << "Reading columns " << std::endl;
     mdb_read_columns(table);
+    mdb_read_indices(table);
+
     mdb_rewind_table(table);
 
     return true;
@@ -111,7 +95,52 @@ public:
     return res;
   }
 
+  bool write(std::string const& name, val const& obj) {
+    if (!load_table(name))
+      throw "couldn't load table";
+    
+    auto table = m_tables[name];
+
+    mdb_free_tabledef(table);
+
+    return false;
+  }
+
+  void save() {
+    reopen();
+  }
+
 private:
+  void reopen() {
+    if (m_handle != nullptr)
+      close();
+    
+    std::cout << "Reading file " << m_path << std::endl;
+    auto handle = mdb_open(m_path.c_str(), MdbFileFlags::MDB_WRITABLE);
+    if (handle == nullptr)
+      throw "failed to open file";
+
+    std::cout << "Reading catalog" << std::endl;
+    if (!mdb_read_catalog(handle, MDB_TABLE)) {
+      mdb_close(handle);
+      throw "failed to read catalog";
+    }
+
+    std::cout << "Done" << std::endl;
+
+    m_handle = handle;
+  }
+
+  void close() {
+    for (auto &k : m_tables) {
+      mdb_free_tabledef(k.second);
+    }
+    m_tables.clear();
+
+    mdb_close(m_handle);
+  }
+
+  std::string m_path;
   MdbHandle *m_handle;
   std::unordered_map<std::string, MdbTableDef *> m_tables;
 };
@@ -150,8 +179,9 @@ EMSCRIPTEN_BINDINGS(libmdb) {
       .function("load_table", &Mdb::load_table)
       .function("get_tables", &Mdb::get_tables)
       .function("read_table", &Mdb::read_table)
+      .function("write", &Mdb::write)
+      .function("save", &Mdb::save)
       ;
 
   register_vector<std::string>("vector<string>");
-  // function("mdbjs_open", &mdbjs_open);
 }

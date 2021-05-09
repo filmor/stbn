@@ -9,6 +9,7 @@
 
         <input id="loader" type="file" />
         <button onclick="javascript:load()">Load</button>
+        <button onclick="javascript:download()">Download</button>
     </body>
 </html>
 <script>
@@ -25,5 +26,28 @@
         }
 
         reader.readAsArrayBuffer(file);
+    }
+
+    function download() {
+        const input = document.querySelector('input[type="file"]');
+        const loadedFile = input.files[0];
+        window.mdb.save();
+
+        const data = FS.readFile("/tmp/table.mdb");
+        const blob = new Blob([data], {
+            type: "application/msaccess"
+        });
+        const url = URL.createObjectURL(blob);
+
+        let a = document.createElement("a");
+        a.style = "display: none";
+        document.body.appendChild(a);
+
+        a.href = url;
+        a.download = loadedFile.name;
+        a.click();
+
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
     }
 </script>
