@@ -20,6 +20,66 @@
 #include <inttypes.h>
 #include "mdbtools.h"
 
+typedef struct _RC4_KEY
+{
+	unsigned char state[256];
+	unsigned char x;
+	unsigned char y;
+} RC4_KEY;
+
+#define swap_byte(x,y) t = *(x); *(x) = *(y); *(y) = t
+
+static void RC4_set_key(RC4_KEY *key, int key_data_len, unsigned char *key_data_ptr)
+{
+	unsigned char t;
+	unsigned char index1;
+	unsigned char index2;
+	unsigned char* state;
+	short counter;
+
+	state = &key->state[0];
+	for(counter = 0; counter < 256; counter++)
+		state[counter] = counter;
+	key->x = 0;
+	key->y = 0;
+	index1 = 0;
+	index2 = 0;
+	for(counter = 0; counter < 256; counter++) {
+		index2 = (key_data_ptr[index1] + state[counter] + index2) % 256;
+		swap_byte(&state[counter], &state[index2]);
+		index1 = (index1 + 1) % key_data_len;
+	}
+}
+
+/*
+ * this algorithm does 'encrypt in place' instead of inbuff/outbuff
+ * note also: encryption and decryption use same routine
+ * implementation supplied by (Adam Back) at <adam at cypherspace dot org>
+ */
+
+static void RC4(RC4_KEY *key, int buffer_len, unsigned char * buff)
+{
+	unsigned char t;
+	unsigned char x;
+	unsigned char y;
+	unsigned char* state;
+	unsigned char xorIndex;
+	short counter;
+
+	x = key->x;
+	y = key->y;
+	state = &key->state[0];
+	for(counter = 0; counter < buffer_len; counter++) {
+		x = (x + 1) % 256;
+		y = (state[x] + y) % 256;
+		swap_byte(&state[x], &state[y]);
+		xorIndex = (state[x] + state[y]) % 256;
+		buff[counter] ^= state[xorIndex];
+	}
+	key->x = x;
+	key->y = y;
+}
+
 //static int mdb_copy_index_pg(MdbTableDef *table, MdbIndex *idx, MdbIndexPage *ipg);
 static int mdb_add_row_to_leaf_pg(MdbTableDef *table, MdbIndex *idx, MdbIndexPage *ipg, MdbField *idx_fields, guint32 pgnum, guint16 rownum);
 
@@ -70,6 +130,7 @@ mdb_write_pg(MdbHandle *mdb, unsigned long pg)
 {
 	ssize_t len;
 	off_t offset = pg * mdb->fmt->pg_size;
+	unsigned char* buf = mdb->pg_buf;
 
     fseeko(mdb->f->stream, 0, SEEK_END);
 	/* is page beyond current size + 1 ? */
@@ -78,7 +139,26 @@ mdb_write_pg(MdbHandle *mdb, unsigned long pg)
 		return 0;
 	}
 	fseeko(mdb->f->stream, offset, SEEK_SET);
-	len = fwrite(mdb->pg_buf, 1, mdb->fmt->pg_size, mdb->f->stream);
+
+	if (pg != 0 && mdb->f->db_key != 0) {
+		buf = g_malloc(mdb->fmt->pg_size);
+		if (!buf) {
+			fprintf(stderr,"failed to allocate buffer for encryption");
+			return 0;
+		}
+		memcpy(buf, mdb->pg_buf, mdb->fmt->pg_size);
+
+		RC4_KEY rc4_key;
+		unsigned int tmp_key = mdb->f->db_key ^ pg;
+		RC4_set_key(&rc4_key, 4, (unsigned char *)&tmp_key);
+		RC4(&rc4_key, mdb->fmt->pg_size, buf);
+	}
+
+	len = fwrite(buf, 1, mdb->fmt->pg_size, mdb->f->stream);
+	if (buf != mdb->pg_buf) {
+		g_free(buf);
+	}
+
 	if (ferror(mdb->f->stream)) {
 		perror("write");
 		return 0;
