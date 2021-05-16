@@ -1,4 +1,5 @@
 #include <iostream>
+#include <mdbfakeglib.h>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -95,15 +96,77 @@ public:
     return res;
   }
 
-  bool write(std::string const& name, val const& obj) {
+  bool write_row(std::string const& name, val const& obj) {
     if (!load_table(name))
       throw "couldn't load table";
     
     auto table = m_tables[name];
+    mdb_rewind_table(table);
 
-    mdb_free_tabledef(table);
+    // TODO: Find and overwrite existing row
 
-    return false;
+    auto fields = std::vector<MdbField>(table->num_cols);
+
+    for (int i = 0; i < table->num_cols; ++i) {
+      auto& field = fields[i];
+      auto col = (MdbColumn*)g_ptr_array_index(table->columns, i);
+
+      field.colnum = i;
+      field.is_fixed = col->is_fixed;
+
+      switch (col->col_type) {
+        case MDB_TEXT:
+        {
+          auto s = obj[col->name].as<std::string>();
+          std::cout << "Reading text " << col->name << " as " << s << std::endl;
+          auto outlen = s.length() * 2;
+          auto buf = (char*)g_malloc0(outlen);
+          field.siz = mdb_ascii2unicode(m_handle, s.c_str(), s.length(), buf, outlen);
+          field.value = buf;
+          break;
+        }
+        case MDB_INT:
+        {
+          auto i16 = obj[col->name].as<int16_t>();
+          std::cout << "Reading int " << col->name << " as " << i16 << " size " << mdb_col_fixed_size(col) << std::endl;
+          field.siz = mdb_col_fixed_size(col);
+          field.value = g_malloc0(field.siz);
+          mdb_put_int16(field.value, 0, i16);
+          break;
+        }
+        case MDB_LONGINT:
+        {
+          auto i32 = obj[col->name].as<uint32_t>();
+          std::cout << "Reading long int " << col->name << " as " << i32 << " size " << mdb_col_fixed_size(col) << std::endl;
+          field.siz = mdb_col_fixed_size(col);
+          field.value = g_malloc0(field.siz);
+          mdb_put_int32(field.value, 0, i32);
+          break;
+        }
+        case MDB_BOOL:
+        {
+          auto b = obj[col->name].as<bool>();
+          field.is_null = b ? 1 : 0;
+          break;
+        }
+        case MDB_FLOAT:
+        case MDB_DOUBLE:
+        case MDB_MONEY:
+        case MDB_DATETIME:
+        case MDB_OLE:
+        case MDB_MEMO:
+        case MDB_REPID:
+        case MDB_NUMERIC:
+        default:
+          throw "Invalid type";
+      }
+    }
+
+    mdb_insert_row(table, table->num_cols, &fields[0]);
+
+    // TODO: Clear memory allocated for the fields
+
+    return true;
   }
 
   void save() {
@@ -125,8 +188,6 @@ private:
       mdb_close(handle);
       throw "failed to read catalog";
     }
-
-    std::cout << "Done" << std::endl;
 
     m_handle = handle;
   }
@@ -163,7 +224,7 @@ static void set_value(val& row, MdbColumn* col, std::vector<char> const& value, 
     case MDB_INT:
     case MDB_LONGINT:
       long res;
-      std::from_chars(&value[0], &value[0] + size, res, 16);
+      std::from_chars(&value[0], &value[0] + size, res, 10);
       row.set(col->name, res);
       break;
     
@@ -179,7 +240,7 @@ EMSCRIPTEN_BINDINGS(libmdb) {
       .function("load_table", &Mdb::load_table)
       .function("get_tables", &Mdb::get_tables)
       .function("read_table", &Mdb::read_table)
-      .function("write", &Mdb::write)
+      .function("write_row", &Mdb::write_row)
       .function("save", &Mdb::save)
       ;
 
