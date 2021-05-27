@@ -18,7 +18,7 @@
 
 #include <time.h>
 #include <inttypes.h>
-#include "mdbtools.h"
+#include "mdbprivate.h"
 
 typedef struct _RC4_KEY
 {
@@ -130,7 +130,7 @@ mdb_write_pg(MdbHandle *mdb, unsigned long pg)
 {
 	ssize_t len;
 	off_t offset = pg * mdb->fmt->pg_size;
-	unsigned char* buf = mdb->pg_buf;
+	unsigned char *buf = mdb->pg_buf;
 
     fseeko(mdb->f->stream, 0, SEEK_END);
 	/* is page beyond current size + 1 ? */
@@ -140,21 +140,15 @@ mdb_write_pg(MdbHandle *mdb, unsigned long pg)
 	}
 	fseeko(mdb->f->stream, offset, SEEK_SET);
 
-	if (pg != 0 && mdb->f->db_key != 0) {
-		buf = g_malloc(mdb->fmt->pg_size);
-		if (!buf) {
-			fprintf(stderr,"failed to allocate buffer for encryption");
-			return 0;
-		}
-		memcpy(buf, mdb->pg_buf, mdb->fmt->pg_size);
-
-		RC4_KEY rc4_key;
+	if (pg != 0 && mdb->f->db_key != 0)
+	{
+		buf = g_memdup2(mdb->pg_buf, mdb->fmt->pg_size);
 		unsigned int tmp_key = mdb->f->db_key ^ pg;
-		RC4_set_key(&rc4_key, 4, (unsigned char *)&tmp_key);
-		RC4(&rc4_key, mdb->fmt->pg_size, buf);
+		mdbi_rc4((unsigned char*)&tmp_key, 4, buf, mdb->fmt->pg_size);
 	}
 
 	len = fwrite(buf, 1, mdb->fmt->pg_size, mdb->f->stream);
+
 	if (buf != mdb->pg_buf) {
 		g_free(buf);
 	}
