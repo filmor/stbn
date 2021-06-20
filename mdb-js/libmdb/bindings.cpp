@@ -96,7 +96,7 @@ public:
     return res;
   }
 
-  bool write_row(std::string const& name, val const& obj) {
+  bool insert_row(std::string const& name, val const& obj) {
     if (!load_table(name))
       throw "couldn't load table";
     
@@ -169,6 +169,14 @@ public:
     return true;
   }
 
+  void delete_row(std::string const& table, std::string const& column, val const& value) {
+
+  }
+
+  void update_row(std::string const& table, std::string const& column, val const& row) {
+    
+  }
+
   void save() {
     reopen();
   }
@@ -199,6 +207,33 @@ private:
     m_tables.clear();
 
     mdb_close(m_handle);
+  }
+
+  int find_row(std::string const& name, std::string const& col_name, val const& value) {
+    static MdbSargNode sarg;
+    sarg.op = MDB_EQUAL;
+
+    if (!load_table(name))
+      throw "bla";
+    
+    auto table = m_tables[name];
+
+    for (int i = 0; i < table->num_cols; ++i) {
+      auto col = (MdbColumn*)g_ptr_array_index(table->columns, i);
+      if (!g_ascii_strcasecmp(col->name, col_name.c_str())) {
+        sarg.col = col;
+        break;
+      }
+    }
+
+    // sarg.value;
+
+    table->sarg_tree = &sarg;
+
+    mdb_rewind_table(table);
+    while (mdb_fetch_row(table)) {
+      return table->cur_row;
+    }
   }
 
   std::string m_path;
@@ -240,7 +275,9 @@ EMSCRIPTEN_BINDINGS(libmdb) {
       .function("load_table", &Mdb::load_table)
       .function("get_tables", &Mdb::get_tables)
       .function("read_table", &Mdb::read_table)
-      .function("write_row", &Mdb::write_row)
+      .function("insert_row", &Mdb::insert_row)
+      .function("update_row", &Mdb::update_row)
+      .function("delete_row", &Mdb::delete_row)
       .function("save", &Mdb::save)
       ;
 
