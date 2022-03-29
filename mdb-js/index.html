@@ -1,18 +1,50 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="utf8">
-        <script type="text/javascript" src="libmdb.js"></script>
-    </head>
-    <body>
-        <h1>Test</h1>
 
-        <input id="loader" type="file" />
-        <button onclick="javascript:load()">Load</button>
-        <button onclick="javascript:download()">Download</button>
-    </body>
+<head>
+    <meta charset="utf8">
+    <script type="text/javascript" src="libmdb.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://unpkg.com/purecss@2.1.0/build/pure-min.css"
+        integrity="sha384-yHIFVG6ClnONEA5yB5DJXfW2/KC173DIQrYoZMEtBvGzmf0PKiGyNEqe9N6BNDBH" crossorigin="anonymous">
+</head>
+
+<body>
+    <h1>MDB</h1>
+
+    <div class="pure-g">
+        <div class="pure-u-1-3">
+            <form onsubmit="return false;" class="pure-form pure-form-stacked">
+                <fieldset>
+                    <legend>Datei</legend>
+                    <input id="loader" type="file" class="pure-button" />
+                    <button onclick="javascript:load()" class="pure-button pure-button-primary">Laden</button>
+                    <button id="download_button" onclick="javascript:download()" disabled
+                        class="pure-button pure-button-secondary">Herunterladen</button>
+                </fieldset>
+            </form>
+
+            <form onsubmit="return false;" class="pure-form pure-form-stacked">
+                <fieldset>
+                    <legend>Tabelle</legend>
+                    <select id="selected_table" oninput="javascript:refresh_table()" disabled>
+                        <option>noch nicht geladen</option>
+                    </select>
+                </fieldset>
+            </form>
+        </div>
+
+        <div id="shown_table" class="pure-u-2-3"></div>
+    </div>
+</body>
+
 </html>
 <script>
+    function clear(el) {
+        while (el.firstChild)
+            el.removeChild(el.firstChild);
+    }
+
     function load() {
         const input = document.querySelector('input[type="file"]');
         const file = input.files[0];
@@ -21,8 +53,23 @@
         reader.onload = function (e) {
             window.buf = e.target.result;
             FS.writeFile("/tmp/table.mdb", new Uint8Array(buf));
-            window.mdb = new Module.Mdb("/tmp/table.mdb");        
+            let mdb = new Module.Mdb("/tmp/table.mdb");
+            window.mdb = mdb;
             console.log("Loaded");
+
+            let button = document.getElementById("download_button");
+            button.removeAttribute("disabled");
+
+            let selected_table = document.getElementById("selected_table");
+            clear(selected_table);
+
+            mdb.get_tables().forEach((name) => {
+                let el = document.createElement("option");
+                el.textContent = name;
+                selected_table.appendChild(el);
+            });
+
+            selected_table.removeAttribute("disabled");
         }
 
         reader.readAsArrayBuffer(file);
@@ -49,5 +96,51 @@
 
         URL.revokeObjectURL(url);
         document.body.removeChild(a);
+    }
+
+    function show_table(name) {
+        let data = window.mdb.read_table(name);
+        console.log(data);
+
+        let div = document.getElementById("shown_table");
+        clear(div);
+
+        if (data.length == 0) {
+            div.appendChild(document.createTextNode("Leer"));
+            return;
+        }
+
+        let table = document.createElement("table");
+        table.setAttribute("class", "pure-table");
+        let thead = document.createElement("thead");
+
+        let keys = Object.keys(data[0]);
+
+        let headerRow = document.createElement("tr");
+        keys.forEach(k => {
+            let el = document.createElement("th");
+            el.textContent = k;
+            headerRow.appendChild(el);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        let tbody = document.createElement("tbody");
+        data.forEach(d => {
+            let row = document.createElement("tr");
+            Object.values(d).forEach(k => {
+                let el = document.createElement("td");
+                el.textContent = k;
+                row.appendChild(el);
+            });
+            tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        div.appendChild(table);
+    }
+
+    function refresh_table() {
+        let selected_table = document.getElementById("selected_table");
+        show_table(selected_table.value);
     }
 </script>
