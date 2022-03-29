@@ -105,16 +105,11 @@
         let div = document.getElementById("shown_table");
         clear(div);
 
-        if (data.length == 0) {
-            div.appendChild(document.createTextNode("Leer"));
-            return;
-        }
-
         let table = document.createElement("table");
         table.setAttribute("class", "pure-table");
         let thead = document.createElement("thead");
 
-        let keys = Object.keys(data[0]);
+        let keys = data.columns;
 
         let headerRow = document.createElement("tr");
         keys.forEach(k => {
@@ -126,11 +121,13 @@
         table.appendChild(thead);
 
         let tbody = document.createElement("tbody");
-        data.forEach(d => {
+        data.data.forEach(d => {
             let row = document.createElement("tr");
-            Object.values(d).forEach(k => {
+            keys.forEach(k => {
                 let el = document.createElement("td");
-                el.textContent = k;
+                if (k in d) {
+                    el.textContent = d[k];
+                }
                 row.appendChild(el);
             });
             tbody.appendChild(row);

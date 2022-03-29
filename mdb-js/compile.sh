@@ -7,4 +7,6 @@ emcc --bind \
   -DICONV_CONST= \
   -I./libmdb/include \
   -gsource-map \
-  -g3
+  -g3 \
+  -s ALLOW_MEMORY_GROWTH=1 \
+  --source-map-base /
